@@ -1,0 +1,581 @@
+From 32112e40c77147766b1052d230902bdffe48cd13 Mon Sep 17 00:00:00 2001
+From: Nguyen Quang Minh <hello@minhng99.eu>
+Date: Wed, 25 Aug 2021 08:46:28 +0000
+Subject: [PATCH] Add Nokia AC220i
+
+---
+ package/boot/uboot-envtools/files/ipq40xx     |   3 +
+ .../ipq40xx/base-files/etc/board.d/01_leds    |   8 +
+ .../ipq40xx/base-files/etc/board.d/02_network |   1 +
+ .../etc/hotplug.d/firmware/11-ath10k-caldata  |   8 +
+ .../ipq40xx/base-files/etc/init.d/bootcount   |   3 +
+ .../base-files/lib/upgrade/platform.sh        |   5 +
+ .../arm/boot/dts/qcom-ipq4029-wi2b-ac220i.dts | 407 ++++++++++++++++++
+ target/linux/ipq40xx/image/generic.mk         |  15 +
+ .../901-arm-boot-add-dts-files.patch          |   3 +-
+ 9 files changed, 452 insertions(+), 1 deletion(-)
+ create mode 100644 target/linux/ipq40xx/files/arch/arm/boot/dts/qcom-ipq4029-wi2b-ac220i.dts
+
+diff --git a/package/boot/uboot-envtools/files/ipq40xx b/package/boot/uboot-envtools/files/ipq40xx
+index ac66a7f2bd..ea4490b960 100644
+--- a/package/boot/uboot-envtools/files/ipq40xx
++++ b/package/boot/uboot-envtools/files/ipq40xx
+@@ -60,6 +60,9 @@ linksys,ea8300 |\
+ linksys,mr8300)
+ 	ubootenv_add_uci_config "/dev/mtd7" "0x0" "0x40000" "0x20000"
+ 	;;
++nokia,wi2b-ac220i)
++	ubootenv_add_uci_config "/dev/mtd12" "0x0" "0x10000" "0x10000"
++	;;
+ zyxel,nbg6617)
+ 	ubootenv_add_uci_config "/dev/mtd6" "0x0" "0x10000" "0x10000"
+ 	;;
+diff --git a/target/linux/ipq40xx/base-files/etc/board.d/01_leds b/target/linux/ipq40xx/base-files/etc/board.d/01_leds
+index efd5d002db..1bb0d20d93 100755
+--- a/target/linux/ipq40xx/base-files/etc/board.d/01_leds
++++ b/target/linux/ipq40xx/base-files/etc/board.d/01_leds
+@@ -57,6 +57,14 @@ netgear,ex6150v2)
+ 	ucidef_set_led_wlan "wlan2g" "WLAN2G" "green:router" "phy0tpt"
+ 	ucidef_set_led_wlan "wlan5g" "WLAN5G" "green:client" "phy1tpt"
+ 	;;
++nokia,wi2b-ac220i)
++	ucidef_set_led_netdev "lan_link" "LAN" "green:eth" "eth0" "link"
++	ucidef_set_led_netdev "lan_act" "LAN" "red:eth" "eth0" "tx rx"
++	ucidef_set_led_wlan "wlan2g_link" "WLAN2G" "green:wlan2g" "phy0tpt"
++	ucidef_set_led_wlan "wlan2g_assoc" "WLAN2G" "red:wlan2g" "phy0assoc"
++	ucidef_set_led_wlan "wlan5g_link" "WLAN5G" "green:wlan5g" "phy1tpt"
++	ucidef_set_led_wlan "wlan5g_assoc" "WLAN5G" "red:wlan5g" "phy1assoc"
++	;;
+ qxwlan,e2600ac-c1 |\
+ qxwlan,e2600ac-c2)
+ 	ucidef_set_led_wlan "wlan2g" "WLAN0" "green:wlan0" "phy0tpt"
+diff --git a/target/linux/ipq40xx/base-files/etc/board.d/02_network b/target/linux/ipq40xx/base-files/etc/board.d/02_network
+index cfcf518907..2cc841a716 100755
+--- a/target/linux/ipq40xx/base-files/etc/board.d/02_network
++++ b/target/linux/ipq40xx/base-files/etc/board.d/02_network
+@@ -32,6 +32,7 @@ ipq40xx_setup_interfaces()
+ 	meraki,mr33|\
+ 	netgear,ex6100v2|\
+ 	netgear,ex6150v2|\
++	nokia,wi2b-ac220i|\
+ 	tp-link,ec420-g1|\
+ 	zyxel,wre6606)
+ 		ucidef_set_interface_wan "eth0"
+diff --git a/target/linux/ipq40xx/base-files/etc/hotplug.d/firmware/11-ath10k-caldata b/target/linux/ipq40xx/base-files/etc/hotplug.d/firmware/11-ath10k-caldata
+index 561c8289e7..fccfa067e5 100644
+--- a/target/linux/ipq40xx/base-files/etc/hotplug.d/firmware/11-ath10k-caldata
++++ b/target/linux/ipq40xx/base-files/etc/hotplug.d/firmware/11-ath10k-caldata
+@@ -154,6 +154,10 @@ case "$FIRMWARE" in
+ 		caldata_extract "ART" 0x1000 0x2f20
+ 		ath10k_patch_mac $(mtd_get_mac_binary dnidata 0x0)
+ 		;;
++	nokia,wi2b-ac220i)
++		caldata_extract "0:ART" 0x1000 0x2f20
++		ath10k_patch_mac $(macaddr_add $(cat /sys/class/net/eth0/address) +1)
++		;;
+ 	zyxel,nbg6617 |\
+ 	zyxel,wre6606)
+ 		caldata_extract "ART" 0x1000 0x2f20
+@@ -267,6 +271,10 @@ case "$FIRMWARE" in
+ 		caldata_extract "ART" 0x5000 0x2f20
+ 		ath10k_patch_mac $(mtd_get_mac_binary dnidata 0xc)
+ 		;;
++	nokia,wi2b-ac220i)
++		caldata_extract "0:ART" 0x5000 0x2f20
++		ath10k_patch_mac $(macaddr_add $(cat /sys/class/net/eth0/address) +2)
++		;;
+ 	zyxel,nbg6617 |\
+ 	zyxel,wre6606)
+ 		caldata_extract "ART" 0x5000 0x2f20
+diff --git a/target/linux/ipq40xx/base-files/etc/init.d/bootcount b/target/linux/ipq40xx/base-files/etc/init.d/bootcount
+index d2a4abcadd..2ac0b3820f 100755
+--- a/target/linux/ipq40xx/base-files/etc/init.d/bootcount
++++ b/target/linux/ipq40xx/base-files/etc/init.d/bootcount
+@@ -13,5 +13,8 @@ boot() {
+ 	linksys,mr8300)
+ 		mtd resetbc s_env || true
+ 		;;
++	nokia,wi2b-ac220i)
++		/usr/sbin/fw_setenv PKRstCnt 0
++		;;
+ 	esac
+ }
+diff --git a/target/linux/ipq40xx/base-files/lib/upgrade/platform.sh b/target/linux/ipq40xx/base-files/lib/upgrade/platform.sh
+index 7ebe0396f6..eb75bc23e1 100644
+--- a/target/linux/ipq40xx/base-files/lib/upgrade/platform.sh
++++ b/target/linux/ipq40xx/base-files/lib/upgrade/platform.sh
+@@ -115,6 +115,11 @@ platform_do_upgrade() {
+ 		CI_KERNPART="part.safe"
+ 		nand_do_upgrade "$1"
+ 		;;
++	nokia,wi2b-ac220i)
++		CI_UBIPART="rootfs"
++		CI_ROOTPART="ubi_rootfs"
++		nand_do_upgrade "$1"
++		;;
+ 	openmesh,a42 |\
+ 	openmesh,a62 |\
+ 	plasmacloud,pa1200 |\
+diff --git a/target/linux/ipq40xx/files/arch/arm/boot/dts/qcom-ipq4029-wi2b-ac220i.dts b/target/linux/ipq40xx/files/arch/arm/boot/dts/qcom-ipq4029-wi2b-ac220i.dts
+new file mode 100644
+index 0000000000..99c332da91
+--- /dev/null
++++ b/target/linux/ipq40xx/files/arch/arm/boot/dts/qcom-ipq4029-wi2b-ac220i.dts
+@@ -0,0 +1,407 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Device Tree Source for Nokia Airscale WI2B-AC220i
++ *
++ * Copyright (C) 2020 Nguyen Quang Minh <hello@minhng99.eu>
++ *
++ * Based on reverse engineered device tree from stock firmware
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without
++ * any warranty of any kind, whether express or implied.
++ */
++
++#include "qcom-ipq4019.dtsi"
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/soc/qcom,tcsr.h>
++
++/ {
++	model = "Nokia Airscale WI2B-AC220i";
++	compatible = "nokia,wi2b-ac220i";
++
++	aliases {
++		led-boot = &pwr_red;
++		led-upgrade = &pwr_green;
++		led-failsafe = &pwr_red;
++		led-running = &pwr_green;
++		label-mac-device = &gmac0;
++	};
++
++	chosen {
++		bootargs-append = " ubi.mtd=rootfs ubi.block=0,1 root=/dev/ubiblock0_1 rootfstype=squashfs ro clk_ignore_unused";
++
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x80000000 0x20000000>; /* 512MB */
++	};
++
++	soc {
++
++		mdio@90000 {
++			status = "okay";
++			pinctrl-0 = <&mdio_pins>;
++			pinctrl-names = "default";
++
++			/delete-node/ ethernet-phy@0;
++			/delete-node/ ethernet-phy@1;
++			/delete-node/ ethernet-phy@2;
++			/delete-node/ ethernet-phy@3;
++			/delete-node/ ethernet-phy@4;
++			/delete-node/ psgmii-phy@5;
++
++			ethernet-phy@5 {
++				reg = <0x5>;
++			};
++		};
++
++		rng@22000 {
++			status = "okay";
++		};
++
++		counter@4a1000 {
++			compatible = "qcom,qca-gcnt";
++			reg = <0x4a1000 0x4>;
++		};
++
++		ess_tcsr@1953000 {
++			compatible = "qcom,tcsr";
++			reg = <0x1953000 0x1000>;
++			qcom,ess-interface-select = <TCSR_ESS_PSGMII_RGMII5>;
++		};
++
++		tcsr@1949000 {
++			compatible = "qcom,tcsr";
++			reg = <0x1949000 0x100>;
++			qcom,wifi_glb_cfg = <TCSR_WIFI_GLB_CFG>;
++		};
++
++		tcsr@1957000 {
++			compatible = "qcom,tcsr";
++			reg = <0x1957000 0x100>;
++			qcom,wifi_noc_memtype_m0_m2 = <TCSR_WIFI_NOC_MEMTYPE_M0_M2>;
++		};
++
++		crypto@8e3a000 {
++			status = "okay";
++		};
++
++		watchdog@b017000 {
++			status = "okay";
++		};
++
++		ess-switch@c000000 {
++			switch_mac_mode = <0x3>; /* mac mode for RGMII RMII */
++			switch_lan_bmp = <0x0>; /* lan port bitmap */
++			switch_wan_bmp = <0x10>; /* wan port bitmap */
++		};
++
++		edma@c080000 {
++			qcom,single-phy;
++			qcom,num_gmac = <1>;
++			phy-mode = "rgmii-id";
++			status = "okay";
++		};
++
++	};
++
++	keys {
++		compatible = "gpio-keys";
++
++		reset {
++			label = "reset";
++			gpios = <&tlmm 50 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_RESTART>;
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		pinctrl-0 = <&led_pins>;
++		pinctrl-names = "default";
++
++		wlan5g_green {
++			label = "green:wlan5g";
++			gpios = <&tlmm 46 GPIO_ACTIVE_LOW>;
++		};
++
++		wlan5g_red {
++			label = "red:wlan5g";
++			gpios = <&tlmm 45 GPIO_ACTIVE_LOW>;
++		};
++
++		wlan2g_green {
++			label = "green:wlan2g";
++			gpios = <&tlmm 40 GPIO_ACTIVE_LOW>;
++		};
++
++		wlan2g_red {
++			label = "red:wlan2g";
++			gpios = <&tlmm 39 GPIO_ACTIVE_LOW>;
++		};
++
++		eth_green {
++			label = "green:eth";
++			gpios = <&tlmm 48 GPIO_ACTIVE_LOW>;
++		};
++
++		eth_red {
++			label = "red:eth";
++			gpios = <&tlmm 47 GPIO_ACTIVE_LOW>;
++		};
++
++		ctrl_green {
++			label = "green:ctrl";
++			gpios = <&tlmm 43 GPIO_ACTIVE_LOW>;
++		};
++
++		ctrl_red {
++			label = "red:ctrl";
++			gpios = <&tlmm 42 GPIO_ACTIVE_LOW>;
++		};
++
++		pwr_green: pwr_green {
++			label = "green:pwr";
++			gpios = <&tlmm 52 GPIO_ACTIVE_LOW>;
++		};
++
++		pwr_red: pwr_red {
++			label = "red:pwr";
++			gpios = <&tlmm 49 GPIO_ACTIVE_LOW>;
++			panic-indicator;
++		};
++	};
++};
++
++&tlmm {
++
++	mdio_pins: mdio_pinmux {
++
++		mux_1 {
++			pins = "gpio6";
++			function = "mdio";
++			bias-pull-up;
++		};
++
++		mux_2 {
++			pins = "gpio7";
++			function = "mdc";
++			bias-pull-up;
++		};
++
++	};
++
++	serial_0_pins: serial0-pinmux {
++		pins = "gpio16", "gpio17";
++		function = "blsp_uart0";
++		bias-disable;
++	};
++
++	spi_0_pins: spi-0-pinmux {
++
++		pinmux {
++			function = "blsp_spi0";
++			pins = "gpio13", "gpio14", "gpio15";
++			bias-disable;
++		};
++
++		pinmux_cs {
++			function = "gpio";
++			pins = "gpio12";
++			bias-disable;
++			output-high;
++		};
++
++	};
++
++	led_pins: led_pins {
++
++		mux {
++			pins = "gpio46", "gpio45", "gpio40", "gpio39", "gpio48",
++			       "gpio47", "gpio43", "gpio42", "gpio52", "gpio49";
++			function = "gpio";
++			drive-strength = <2>;
++			bias-pull-down;
++		};
++
++	};
++};
++
++&blsp1_uart1 {
++	pinctrl-0 = <&serial_0_pins>;
++	pinctrl-names = "default";
++	status = "ok";
++};
++
++&blsp_dma {
++	status = "okay";
++};
++
++&wifi0 {
++	status = "okay";
++};
++
++&wifi1 {
++	status = "okay";
++};
++
++&cryptobam {
++	status = "okay";
++};
++
++&gmac0 {
++	qcom,phy_mdio_addr = <5>;
++	qcom,poll_required = <1>;
++	vlan_tag = <0 0x20>;
++	mtd-mac-address = <&cfg 0x0>;
++};
++
++&blsp1_spi1 {
++	pinctrl-0 = <&spi_0_pins>;
++	pinctrl-names = "default";
++	status = "ok";
++	cs-gpios = <&tlmm 12 0>;
++
++	w25q32@0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <0>;
++		compatible = "w25q32";
++		spi-max-frequency = <24000000>;
++
++		partitions {
++			compatible = "fixed-partitions";
++
++			SBL1@0 {
++				label = "0:SBL1";
++				reg = <0x00000000 0x00040000>;
++				read-only;
++			};
++
++			MIBIB@40000 {
++				label = "0:MIBIB";
++				reg = <0x00040000 0x00020000>;
++				read-only;
++			};
++
++			BOOTCONFIG@60000 {
++				label = "0:BOOTCONFIG";
++				reg = <0x00060000 0x00020000>;
++			};
++
++			QSEE_1@80000 {
++				label = "0:QSEE_1";
++				reg = <0x00080000 0x00060000>;
++				read-only;
++			};
++
++			QSEE@e0000 {
++				label = "0:QSEE";
++				reg = <0x000e0000 0x00060000>;
++				read-only;
++			};
++
++			CDT_1@140000 {
++				label = "0:CDT_1";
++				reg = <0x00140000 0x00010000>;
++				read-only;
++			};
++
++			CDT@150000 {
++				label = "0:CDT";
++				reg = <0x00150000 0x00010000>;
++				read-only;
++			};
++
++			BOOTCONFIG1@160000 {
++				label = "0:BOOTCONFIG1";
++				reg = <0x00160000 0x00020000>;
++			};
++
++			DDRPARAMS@180000 {
++				label = "0:DDRPARAMS";
++				reg = <0x00180000 0x00010000>;
++				read-only;
++			};
++
++			APPSBLENV@190000 {
++				label = "0:APPSBLENV";
++				reg = <0x00190000 0x00010000>;
++			};
++
++			APPSBL_1@1a0000 {
++				label = "0:APPSBL_1";
++				reg = <0x001a0000 0x00080000>;
++				read-only;
++			};
++
++			APPSBL@220000 {
++				label = "0:APPSBL";
++				reg = <0x00220000 0x00080000>;
++				read-only;
++			};
++
++			RES1@2a0000 {
++				label = "0:RES1";
++				reg = <0x002a0000 0x00130000>;
++				read-only;
++			};
++
++			ART@3d0000 {
++				label = "0:ART";
++				reg = <0x003d0000 0x00010000>;
++				read-only;
++			};
++
++			EID-A@3e0000 {
++				label = "0:EID-A";
++				reg = <0x003e0000 0x00010000>;
++				read-only;
++			};
++
++			EID-B@3f0000 {
++				label = "0:EID-B";
++				reg = <0x003f0000 0x00010000>;
++				read-only;
++			};
++		};
++
++	};
++};
++
++&qpic_bam {
++	status = "okay";
++};
++
++&nand {
++	status = "okay";
++
++	nand@0 {
++		partitions {
++			compatible = "fixed-partitions";
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			rootfs@0 {
++				label = "rootfs";
++				reg = <0x00000000 0x03000000>;
++			};
++
++			rootfs_1@3000000 {
++				label = "rootfs_1";
++				reg = <0x03000000 0x03000000>;
++			};
++
++			cfg: cfg@6000000 {
++				label = "cfg";
++				reg = <0x06000000 0x02000000>;
++			};
++
++		};
++
++	};
++};
+diff --git a/target/linux/ipq40xx/image/generic.mk b/target/linux/ipq40xx/image/generic.mk
+index 7cbfecb233..9a008dd006 100644
+--- a/target/linux/ipq40xx/image/generic.mk
++++ b/target/linux/ipq40xx/image/generic.mk
+@@ -640,6 +640,21 @@ define Device/mobipromo_cm520-79f
+ endef
+ TARGET_DEVICES += mobipromo_cm520-79f
+ 
++define Device/nokia_wi2b-ac220i
++	$(call Device/FitImage)
++	$(call Device/UbiFit)
++	DEVICE_VENDOR := Nokia Airscale
++	DEVICE_MODEL := WI2B-AC220i
++	SOC := qcom-ipq4029
++	BLOCKSIZE := 128k
++	PAGESIZE := 2048
++	DEVICE_PACKAGES := -swconfig
++	IMAGES := sysupgrade.bin rootfs.sqsh uImage.itb
++	IMAGE/rootfs.sqsh := append-rootfs
++	IMAGE/uImage.itb := append-kernel
++endef
++TARGET_DEVICES += nokia_wi2b-ac220i
++
+ define Device/netgear_ex61x0v2
+ 	$(call Device/DniImage)
+ 	DEVICE_VENDOR := NETGEAR
+diff --git a/target/linux/ipq40xx/patches-5.4/901-arm-boot-add-dts-files.patch b/target/linux/ipq40xx/patches-5.4/901-arm-boot-add-dts-files.patch
+index 4d686df304..92a61060ad 100644
+--- a/target/linux/ipq40xx/patches-5.4/901-arm-boot-add-dts-files.patch
++++ b/target/linux/ipq40xx/patches-5.4/901-arm-boot-add-dts-files.patch
+@@ -10,7 +10,7 @@ Signed-off-by: John Crispin <john@phrozen.org>
+ 
+ --- a/arch/arm/boot/dts/Makefile
+ +++ b/arch/arm/boot/dts/Makefile
+-@@ -837,11 +837,61 @@ dtb-$(CONFIG_ARCH_QCOM) += \
++@@ -837,11 +837,62 @@ dtb-$(CONFIG_ARCH_QCOM) += \
+  	qcom-apq8074-dragonboard.dtb \
+  	qcom-apq8084-ifc6540.dtb \
+  	qcom-apq8084-mtp.dtb \
+@@ -68,6 +68,7 @@ Signed-off-by: John Crispin <john@phrozen.org>
+ +	qcom-ipq4029-gl-b1300.dtb \
+ +	qcom-ipq4029-gl-s1300.dtb \
+ +	qcom-ipq4029-mr33.dtb \
+++	qcom-ipq4029-wi2b-ac220i.dtb \
+ +	qcom-ipq40x9-dr40x9.dtb \
+  	qcom-ipq8064-ap148.dtb \
+  	qcom-msm8660-surf.dtb \
+-- 
+2.33.0
+

@@ -1,0 +1,12 @@
+---
+profile: nokia_wi2b-ac220i
+target: ipq40xx
+subtarget: generic
+description: Build image for the Nokia WI2B-AC220i
+image: bin/targets/ipq40xx/generic/openwrt-ipq40xx-generic-nokia_wi2b-ac220i-squashfs-nand-sysupgrade.bin
+include:
+  - ucentral-ap
+packages:
+  - ath10k-firmware-qca4019-ct-htt
+diffconfig: |
+  # CONFIG_PACKAGE_ath10k-firmware-qca4019-ct is not set
